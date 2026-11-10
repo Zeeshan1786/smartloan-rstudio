@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SmartLoan is an R classroom project for exploring loan approval classification.">
+  <title>SmartLoan | R classification lab</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <a class="brand" href="#top"><span aria-hidden="true">SL</span> SmartLoan</a>
+    <nav aria-label="Main navigation"><a href="#predictor">Predictor</a><a href="#evaluation">Evaluation</a><a href="#charts">Charts</a></nav>
+    <span id="connection" class="chip">Connecting to R</span>
+  </header>
+  <main id="top">
+    <section class="intro" aria-labelledby="title">
+      <p class="eyebrow">R CLASSIFICATION LAB</p>
+      <h1 id="title">Explore loan approval predictions</h1>
+      <p>Score a fictional applicant and see how three R models performed on the same test split.</p>
+      <dl class="summary">
+        <div><dt>Dataset</dt><dd id="dataset">Loading</dd></div>
+        <div><dt>Records</dt><dd id="rows">—</dd></div>
+        <div><dt>Model selected on validation</dt><dd id="model">—</dd></div>
+      </dl>
+    </section>
+    <section class="panel" id="predictor" aria-labelledby="predictor-title">
+      <div class="section-head"><div><p class="eyebrow">01 / PREDICTION</p><h2 id="predictor-title">Applicant profile</h2></div>
+        <div class="actions"><button type="button" class="secondary" id="example0" disabled>Example A</button><button type="button" class="secondary" id="example1" disabled>Example B</button></div>
+      </div>
+      <p class="muted">Use fictional details. Leave any unknown value blank to use the model’s training default.</p>
+      <div class="predictor-grid">
+        <form id="form">
+          <div id="fields" class="fields"></div>
+          <button type="submit" id="submit" disabled>Run prediction</button>
+        </form>
+        <aside class="result" id="result" aria-live="polite" aria-atomic="true">
+          <p class="eyebrow">MODEL OUTPUT</p>
+          <h3 id="outcome">Ready for a profile</h3>
+          <p id="details">Load an example or enter your own fictional values, then run the prediction.</p>
+          <meter id="score" min="0" max="1" hidden aria-label="Model score for class Y"></meter>
+        </aside>
+      </div>
+    </section>
+    <section class="panel" id="evaluation" aria-labelledby="evaluation-title">
+      <p class="eyebrow">02 / EVALUATION</p><h2 id="evaluation-title">Compare the models</h2>
+      <p class="muted" id="split">Loading dataset and model details.</p>
+      <div class="actions modes" aria-label="Evaluation split">
+        <button id="test-toggle" type="button" class="secondary" aria-pressed="true">Held-out test</button>
+        <button id="val-toggle" type="button" class="secondary" aria-pressed="false">Validation</button>
+      </div>
+      <div class="table-scroll"><table><caption id="caption">Held-out test metrics</caption>
+        <thead><tr><th scope="col">Model</th><th scope="col">Accuracy</th><th scope="col">Precision</th><th scope="col">Recall</th><th scope="col">Specificity</th><th scope="col">F1</th><th scope="col">ROC AUC</th></tr></thead>
+        <tbody id="metrics"></tbody>
+      </table></div>
+      <p class="muted">Validation F1 selects the model, with AUC breaking ties. The test metrics are reported after that choice.</p>
+    </section>
+    <section class="panel" id="charts" aria-labelledby="charts-title">
+      <p class="eyebrow">03 / VISUAL ANALYSIS</p><h2 id="charts-title">Explore the charts</h2>
+      <p class="muted">Select a chart to enlarge it.</p>
+      <div id="gallery" class="gallery"></div>
+    </section>
+  </main>
+  <footer>SmartLoan classroom project · Model scores are for learning and are not lending recommendations.</footer>
+  <dialog id="viewer" aria-labelledby="chart-name">
+    <form method="dialog"><h2 id="chart-name">Chart</h2><button class="secondary" type="submit">Close</button></form>
+    <img id="chart" alt="">
+  </dialog>
+</body>
+</html>

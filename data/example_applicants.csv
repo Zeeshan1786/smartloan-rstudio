@@ -1,0 +1,3 @@
+Loan_ID,Gender,Married,Dependents,Education,Self_Employed,ApplicantIncome,CoapplicantIncome,LoanAmount,Loan_Amount_Term,Credit_History,Property_Area
+EXAMPLE01,Female,Yes,1,Graduate,No,5600,1900,135,360,1,Semiurban
+EXAMPLE02,Male,No,0,Not Graduate,Yes,3100,0,170,180,0,Urban
