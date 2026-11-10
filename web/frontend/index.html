@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="SmartLoan is an R classroom project for exploring loan approval classification.">
   <title>SmartLoan | R classification lab</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="style.css?v=2">
+  <script src="app.js?v=2" defer></script>
 </head>
 <body>
   <header class="masthead">
@@ -39,8 +39,17 @@
           <p class="eyebrow">MODEL OUTPUT</p>
           <h3 id="outcome">Ready for a profile</h3>
           <p id="details">Load an example or enter your own fictional values, then run the prediction.</p>
-          <meter id="score" min="0" max="1" hidden aria-label="Model score for class Y"></meter>
         </aside>
+      </div>
+      <div class="live-charts" id="live-charts" hidden>
+        <figure><figcaption>Score vs. approval cutoff</figcaption>
+          <p class="chart-note">The model predicts Y when the score reaches the cutoff.</p>
+          <div id="score-chart"></div>
+        </figure>
+        <figure><figcaption>What if the credit history flag changed?</figcaption>
+          <p class="chart-note">All other submitted inputs stay the same. This shows model sensitivity.</p>
+          <div id="scenario-chart"></div>
+        </figure>
       </div>
     </section>
     <section class="panel" id="evaluation" aria-labelledby="evaluation-title">
@@ -51,14 +60,14 @@
         <button id="val-toggle" type="button" class="secondary" aria-pressed="false">Validation</button>
       </div>
       <div class="table-scroll"><table><caption id="caption">Held-out test metrics</caption>
-        <thead><tr><th scope="col">Model</th><th scope="col">Accuracy</th><th scope="col">Precision</th><th scope="col">Recall</th><th scope="col">Specificity</th><th scope="col">F1</th><th scope="col">ROC AUC</th></tr></thead>
+        <thead><tr><th scope="col">Model</th><th scope="col">Cutoff</th><th scope="col">Accuracy</th><th scope="col">Precision</th><th scope="col">Recall</th><th scope="col">Specificity</th><th scope="col">Balanced accuracy</th><th scope="col">F1</th><th scope="col">ROC AUC</th></tr></thead>
         <tbody id="metrics"></tbody>
       </table></div>
-      <p class="muted">Validation F1 selects the model, with AUC breaking ties. The test metrics are reported after that choice.</p>
+      <p class="muted">Model and cutoff are selected using validation balanced accuracy, which gives approvals and rejections equal weight.</p>
     </section>
     <section class="panel" id="charts" aria-labelledby="charts-title">
       <p class="eyebrow">03 / VISUAL ANALYSIS</p><h2 id="charts-title">Explore the charts</h2>
-      <p class="muted">Select a chart to enlarge it.</p>
+      <p class="muted">These charts describe the dataset and test set. Your individual prediction charts appear under the form. Select any chart below to enlarge it.</p>
       <div id="gallery" class="gallery"></div>
     </section>
   </main>

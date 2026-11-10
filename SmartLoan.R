@@ -5,11 +5,12 @@ source("R/plots.R")
 source("R/predict.R")
 source("data/make_demo_data.R")
 
-# Experiment settings. Model choice uses validation F1; the test set is held back.
+# Experiment settings. Choose the model and cutoff on validation only.
 cfg <- list(seed = 123L, validation_fraction = .14, test_fraction = .30,
-            threshold = .50, tree_cp = .01, tree_minsplit = 10L,
+            threshold_grid = seq(.05, .95, by = .01), tree_cp = .01, tree_minsplit = 10L,
             forest_trees = 300L, forest_min_node = 10L, forest_mtry = NULL)
-if (!is.finite(cfg$threshold) || cfg$threshold <= 0 || cfg$threshold >= 1 ||
+if (!length(cfg$threshold_grid) || any(!is.finite(cfg$threshold_grid) |
+    cfg$threshold_grid <= 0 | cfg$threshold_grid >= 1) ||
     cfg$validation_fraction <= 0 || cfg$test_fraction <= 0 ||
     cfg$validation_fraction + cfg$test_fraction >= 1) stop("Invalid split fractions or threshold.")
 
@@ -40,21 +41,29 @@ prepared <- lapply(indices, function(idx) cbind(
 ))
 models <- fit_models(prepared$train, cfg)
 model_titles <- c(Logistic = "Logistic Regression", Tree = "Decision Tree", Forest = "Random Forest")
-evaluate_set <- function(set) lapply(models, function(model) {
-  score(set$Loan_Status, probability_yes(model, set[names(prep)]), cfg$threshold)
-})
+val_p <- lapply(models, probability_yes, x = prepared$validation[names(prep)])
+cutoffs <- vapply(val_p, function(p) {
+  validation_threshold(prepared$validation$Loan_Status, p, cfg$threshold_grid)
+}, numeric(1))
+evaluate_set <- function(set, probs) {
+  setNames(lapply(names(models), function(key) score(set$Loan_Status, probs[[key]], cutoffs[[key]])),
+           names(models))
+}
 metrics_table <- function(scores) {
   data.frame(Model = unname(model_titles[names(scores)]),
+             Threshold = unname(cutoffs[names(scores)]),
              do.call(rbind, lapply(scores, function(s) s$metrics)), row.names = NULL)
 }
-validation <- metrics_table(evaluate_set(prepared$validation))
+validation <- metrics_table(evaluate_set(prepared$validation, val_p))
 # In a tie, prefer higher AUC, then the first model in the comparison.
-winner <- order(-validation$F1, -validation$ROC_AUC)[1L]
+winner <- order(-round(validation$Balanced_Accuracy, 12), -validation$ROC_AUC)[1L]
 selected <- names(models)[winner]
+cfg$threshold <- unname(cutoffs[selected])
 write.csv(validation, "results/validation_metrics.csv", row.names = FALSE)
 
 # The held-out test scores are reported only after selecting a model.
-test_scores <- evaluate_set(prepared$test)
+test_p <- lapply(models, probability_yes, x = prepared$test[names(prep)])
+test_scores <- evaluate_set(prepared$test, test_p)
 test <- metrics_table(test_scores)
 write.csv(test, "results/model_performance_metrics.csv", row.names = FALSE)
 for (key in names(test_scores)) {
@@ -63,12 +72,12 @@ for (key in names(test_scores)) {
   write.csv(test_scores[[key]]$rows,
     file.path("results", paste0("test_predictions_", tolower(key), ".csv")), row.names = FALSE)
 }
-bundle <- list(model = models[[selected]], model_name = unname(model_titles[selected]),
+bundle <- list(schema_version = 2L, model = models[[selected]], model_name = unname(model_titles[selected]),
                preprocessing = prep, config = cfg, data_kind = data_kind)
 saveRDS(bundle, "models/best_loan_model.rds")
 examples <- predict_applications("data/example_applicants.csv", bundle)
 write.csv(examples, "results/applicant_predictions.csv", row.names = FALSE)
-write_plots(data, prep, models, test_scores, test, "plots")
+write_plots(data, prep, models, test_scores, test[names(test) != "Threshold"], "plots")
 writeLines(capture.output(sessionInfo()), "results/session_info.txt")
 
 # Build the report from the actual run. No scores are hardcoded.
@@ -98,7 +107,8 @@ writeLines(c(
   "## Methodology", "",
   "Identical input profiles stay together. Groups are stratified by their recorded label pattern. Medians and modes are fitted on training records only; the validation and test data use those same rules.", "",
   format_table(split_sizes), "",
-  sprintf("Seed: %d. Prediction threshold for Y: %.2f. Validation F1 selects the model; AUC breaks ties.", cfg$seed, cfg$threshold),
+  sprintf("Seed: %d. Selected model threshold for Y: %.2f. Each model's cutoff maximizes validation balanced accuracy; ties favor a cutoff nearest 0.50. The model with the highest validation balanced accuracy is selected, with AUC as the tie-breaker.", cfg$seed, cfg$threshold),
+  "Balanced accuracy is the mean of recall for approvals and specificity for rejections. The test split is the same fixed benchmark as the earlier demo; it was not used to compute these cutoffs.",
   sprintf("Decision tree: cp = %.3f and minsplit = %d. Random forest: %d trees, minimum node size %d, mtry = %s.",
           cfg$tree_cp, cfg$tree_minsplit, cfg$forest_trees, cfg$forest_min_node,
           if (is.null(cfg$forest_mtry)) "ranger default" else as.character(cfg$forest_mtry)), "",
@@ -110,15 +120,17 @@ writeLines(c(
     if (majority_y) "Y" else "N", baseline$metrics["Accuracy"], baseline$metrics["F1"]),
   "Accuracy is the overall correct fraction. Precision is the fraction of predicted approvals that were recorded as approved. Recall is the fraction of recorded approvals found. Specificity is the fraction of recorded rejections found. F1 balances precision and recall. ROC AUC measures ranking across thresholds. Undefined metrics indicate a zero denominator.", "",
   "## Interpretation and limitations", "",
-  sprintf("The selected model had validation F1 %.4f and held-out test F1 %.4f. Its test ROC AUC was %.4f.",
-    validation$F1[winner], test$F1[winner], test$ROC_AUC[winner]),
+  sprintf("The selected model had validation balanced accuracy %.4f and test balanced accuracy %.4f. It predicted Y for %d and N for %d test records.",
+    validation$Balanced_Accuracy[winner], test$Balanced_Accuracy[winner],
+    sum(test_scores[[selected]]$rows$Predicted == "Y"), sum(test_scores[[selected]]$rows$Predicted == "N")),
   "Model scores are not calibrated approval probabilities. Input fields such as gender and marital status are included to demonstrate the assignment schema; these results do not establish fairness or justify using those fields in lending. A single split cannot establish performance across lenders, populations, or time.", "",
   "## Figures", "",
   paste0("- [", sub("[.]png$", "", plot_files), "](plots/", plot_files, ")"), "",
   "## Reproduce", "",
   "Open SmartLoan.Rproj in RStudio, source SmartLoan.R, and inspect results/, plots/, and models/. Then edit data/example_applicants.csv and source PredictLoan.R to score another profile."
 ), "PROJECT_REPORT.md")
-cat("\nSelected using validation F1:", bundle$model_name, "\n\n")
+cat("\nSelected using validation balanced accuracy:", bundle$model_name,
+    "| cutoff:", cfg$threshold, "\n\n")
 cat("Held-out test performance:\n")
 print(test, row.names = FALSE, digits = 4)
 cat("\nExample predictions:\n")

@@ -4,7 +4,8 @@ source("R/core.R")
 install_if_needed(c("plumber", "jsonlite", "ranger", "rpart"))
 artifacts <- c("models/best_loan_model.rds", "results/split_summary.csv",
                "results/validation_metrics.csv", "results/model_performance_metrics.csv")
-if (!all(file.exists(artifacts)) || !dir.exists("plots")) {
+cached <- if (file.exists(artifacts[1])) tryCatch(readRDS(artifacts[1]), error = function(e) NULL)
+if (!all(file.exists(artifacts)) || !dir.exists("plots") || !identical(cached$schema_version, 2L)) {
   message("Training once to generate the artifacts required by the app.")
   source("SmartLoan.R", local = new.env())
 }

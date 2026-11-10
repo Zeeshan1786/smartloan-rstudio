@@ -145,8 +145,16 @@ score <- function(actual, p, threshold) {
   auc <- (sum(rank(p)[actual == "Y"]) - positives * (positives + 1) / 2) / (positives * negatives)
   list(metrics = c(Accuracy = (tp + tn) / sum(cm), Precision = ratio(tp, tp + fp),
                    Recall = ratio(tp, tp + fn), Specificity = ratio(tn, tn + fp),
+                   Balanced_Accuracy = (ratio(tp, tp + fn) + ratio(tn, tn + fp)) / 2,
                    F1 = ratio(2 * tp, 2 * tp + fp + fn), ROC_AUC = auc),
        confusion = cm, rows = data.frame(Actual = actual, Predicted = predicted, P_Y = p))
+}
+
+validation_threshold <- function(actual, p, thresholds) {
+  balance <- vapply(thresholds, function(t) {
+    score(actual, p, t)$metrics[["Balanced_Accuracy"]]
+  }, numeric(1))
+  thresholds[order(-round(balance, 12), abs(thresholds - .5), thresholds)[1L]]
 }
 
 install_if_needed <- function(pkgs) {

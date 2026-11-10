@@ -59,11 +59,53 @@ async function api(path, init) {
   if (!response.ok) throw new Error(payload.error || "The R API returned an error.");
   return payload;
 }
-function showResult(title, text, score) {
+function showResult(title, text, result) {
   get("outcome").textContent = title;
   get("details").textContent = text;
-  get("score").hidden = typeof score !== "number";
-  if (!get("score").hidden) get("score").value = score;
+  get("result").dataset.outcome = result?.predicted_status ?? "";
+  get("live-charts").hidden = !result;
+  if (result) {
+    showBars("score-chart", [["Submitted profile", result]], result.threshold);
+    showBars("scenario-chart", result.scenarios.map((scenario) => [
+      "Credit history = " + scenario.credit_history, scenario
+    ]), result.threshold);
+  }
+}
+function showBars(id, rows, threshold) {
+  const chart = get(id);
+  chart.replaceChildren();
+  for (const [label, result] of rows) {
+    const row = document.createElement("div");
+    row.className = "score-row";
+    const title = document.createElement("div");
+    title.className = "score-label";
+    const name = document.createElement("span");
+    name.textContent = label;
+    const value = document.createElement("span");
+    value.textContent = pct(result.score_y) + " · " + result.predicted_status;
+    title.append(name, value);
+    const track = document.createElement("div");
+    track.className = "score-track";
+    track.setAttribute("aria-hidden", "true");
+    const bar = document.createElement("div");
+    bar.className = "score-bar";
+    bar.dataset.outcome = result.predicted_status;
+    bar.style.width = Number(result.score_y) * 100 + "%";
+    const marker = document.createElement("span");
+    marker.className = "score-cutoff";
+    marker.style.left = Number(threshold) * 100 + "%";
+    track.append(bar, marker);
+    row.append(title, track);
+    chart.append(row);
+  }
+  const scale = document.createElement("div");
+  scale.className = "scale";
+  for (const label of ["0%", "Marker: " + pct(threshold) + " cutoff", "100%"]) {
+    const item = document.createElement("span");
+    item.textContent = label;
+    scale.append(item);
+  }
+  chart.append(scale);
 }
 function displayMetrics(project, mode) {
   get("test-toggle").setAttribute("aria-pressed", String(mode === "test"));
@@ -77,7 +119,7 @@ function displayMetrics(project, mode) {
     name.scope = "row";
     name.textContent = result.Model + (result.Model === project.model ? " · Selected" : "");
     row.append(name);
-    for (const field of ["Accuracy", "Precision", "Recall", "Specificity", "F1", "ROC_AUC"]) {
+    for (const field of ["Threshold", "Accuracy", "Precision", "Recall", "Specificity", "Balanced_Accuracy", "F1", "ROC_AUC"]) {
       const cell = document.createElement("td");
       cell.textContent = field === "ROC_AUC" && result[field] != null ? Number(result[field]).toFixed(3) : pct(result[field]);
       row.append(cell);
@@ -107,8 +149,14 @@ function showCharts(files) {
   }
 }
 
+let revision = 0;
+form.addEventListener("input", () => {
+  revision++;
+  showResult("Profile changed", "Run prediction to update the result and charts.");
+});
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const requestRevision = ++revision;
   get("submit").disabled = true;
   showResult("Running the model", "Waiting for the R API.");
   try {
@@ -116,13 +164,14 @@ form.addEventListener("submit", async (event) => {
     const result = await api("/api/predict", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(profile)
     });
+    if (requestRevision !== revision) return;
     const title = result.predicted_status === "Y" ? "Y · Predicted approved" : "N · Predicted not approved";
     const filled = result.imputed_fields.map((key) => controls.find(([name]) => name === key)?.[1] ?? key);
     const note = filled.length ? "\nTraining defaults applied to: " + filled.join(", ") + "." : "";
     showResult(title, result.model + " · Score for Y: " + pct(result.score_y) +
-      "\nDecision threshold: " + pct(result.threshold) + "." + note, result.score_y);
+      "\nDecision threshold: " + pct(result.threshold) + "." + note, result);
   } catch (error) {
-    showResult("Prediction unavailable", error.message);
+    if (requestRevision === revision) showResult("Prediction unavailable", error.message);
   } finally {
     get("submit").disabled = false;
   }
@@ -135,6 +184,7 @@ api("/api/project").then((project) => {
   get("model").textContent = project.model;
   get("split").textContent = project.splits.map((row) => row.Split + ": " + row.Records).join(" · ");
   const loadExample = (example) => {
+    revision++;
     for (const [key] of controls) form.elements.namedItem(key).value = example[key] ?? "";
     showResult("Profile loaded", "Select Run prediction to score this example.");
   };

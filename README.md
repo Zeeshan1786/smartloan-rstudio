@@ -6,7 +6,7 @@ SmartLoan is an RStudio classroom project that compares **logistic regression**,
 
 Open **SmartLoan.Rproj** in RStudio and source **RunWeb.R**, or run `Rscript RunWeb.R` from the project folder. Open [http://127.0.0.1:3840/](http://127.0.0.1:3840/) while that R session is running. A fresh GitHub checkout trains once to generate the local model, results, and plots. Run `SmartLoan.R` again and restart the app if you change the dataset or model settings.
 
-The frontend in `web/frontend/` provides a form with all 11 applicant inputs, two sample profiles, a validation/test metrics switch, and an expandable chart gallery. The Plumber backend in `web/api.R` serves the UI and JSON on the same local address. It validates and scores one applicant at a time with the saved R model. The app does not store submitted profiles. No database or login is needed.
+The frontend in `web/frontend/` provides a form with all 11 applicant inputs, two sample profiles, a validation/test metrics switch, and an expandable chart gallery. Each prediction updates two charts: the applicant's score against the selected cutoff and a what-if comparison that changes only the credit history flag. These are model scores for an academic exercise, not a causal effect or a credit decision. The Plumber backend in `web/api.R` validates and scores one profile at a time with the saved R model. The app does not store submitted profiles.
 
 | Endpoint | Purpose |
 |---|---|
@@ -64,7 +64,7 @@ Edit the `cfg` list at the top of `SmartLoan.R` to change the defaults.
 | `seed` | 123 | Reproducible split and forest fit. |
 | `validation_fraction` | 0.14 | Approximate fraction of profile groups reserved for model selection. |
 | `test_fraction` | 0.30 | Approximate fraction of profile groups kept for final evaluation. The rest train the models. |
-| `threshold` | 0.50 | Model score at or above this value is classified as Y. |
+| `threshold_grid` | 0.05 to 0.95, step 0.01 | Candidate score cutoffs. Each model's cutoff is selected on validation. |
 | `tree_cp` | 0.01 | Decision tree complexity control. |
 | `tree_minsplit` | 10 | Minimum observations needed to consider a decision tree split. |
 | `forest_trees` | 300 | Number of trees in the random forest. |
@@ -76,7 +76,7 @@ Edit the `cfg` list at the top of `SmartLoan.R` to change the defaults.
 1. Show the input columns and explain that `Loan_Status` is the label the model learns to predict.
 2. Show how duplicates are handled and why the same profile cannot cross splits. Medians and modes come from the training records only.
 3. Explain the models: logistic regression is the baseline, a decision tree gives readable rules, and a random forest averages predictions from many trees.
-4. Open `results/validation_metrics.csv` and show that validation F1 selected the model, with AUC as the tie-breaker. Then open `results/model_performance_metrics.csv` for final test results. Explain why accuracy alone can hide errors on the smaller class.
+4. Open `results/validation_metrics.csv` to see the cutoff and balanced accuracy for each model. Balanced accuracy averages recall and specificity, giving each class equal weight. It selects both the cutoff and the model using validation records only, with ROC AUC breaking ties between models. Open `results/model_performance_metrics.csv` for the fixed test benchmark.
 5. Change an example applicant row and run `PredictLoan.R` to show that the saved model can score it.
 
 This project predicts dataset labels for academic practice. Its outputs are not a lending recommendation, an assessment of creditworthiness, or evidence that demographic inputs should be used in real decisions.

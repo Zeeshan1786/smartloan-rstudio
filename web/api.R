@@ -46,10 +46,21 @@ function(req, res) {
   prepared <- apply_preprocessing(clean, bundle$preprocessing)
   score_y <- as.numeric(probability_yes(bundle$model, prepared))
   if (length(score_y) != 1L || !is.finite(score_y)) stop("The model returned an invalid score.")
+  # Change only the credit-history flag for a model sensitivity comparison.
+  variants <- clean[rep(1L, 2L), , drop = FALSE]
+  variants$Credit_History <- c("0", "1")
+  variant_scores <- probability_yes(bundle$model, apply_preprocessing(variants, bundle$preprocessing))
+  scenarios <- data.frame(credit_history = variants$Credit_History, score_y = round(variant_scores, 6),
+    predicted_status = ifelse(variant_scores >= bundle$config$threshold, "Y", "N"))
   list(predicted_status = if (score_y >= bundle$config$threshold) "Y" else "N",
        score_y = round(score_y, 6), threshold = bundle$config$threshold,
        model = bundle$model_name, dataset = bundle$data_kind,
-       imputed_fields = as.list(names(clean)[vapply(clean, anyNA, logical(1))]))
+       scenarios = scenarios,
+       imputed_fields = as.list(names(prepared)[vapply(names(prepared), function(field) {
+         value <- clean[[field]]
+         is.na(value) || (!is.null(bundle$preprocessing[[field]]$levels) &&
+                          !value %in% bundle$preprocessing[[field]]$levels)
+       }, logical(1))]))
 }
 
 #' Open the SmartLoan interface
